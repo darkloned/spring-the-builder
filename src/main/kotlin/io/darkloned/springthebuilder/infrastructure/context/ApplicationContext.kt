@@ -15,16 +15,25 @@ class ApplicationContext(
     @Suppress("UNCHECKED_CAST")
     fun <T: Any> getObject(type: Class<T>): T =
         cache.getOrElse(type) {
-            val implClass = when {
-                type.isInterface -> config.getImplClass(type)
-                else -> type
-            }
-            val obj = factory.createObject(implClass)
-
-            if (implClass.isAnnotationPresent(Singleton::class.java)) {
-                cache[type] = obj
-            }
-
-            return obj
+            requestNewObject(type)
         } as T
+
+    fun initCache() =
+        config
+            .scanner
+            .getTypesAnnotatedWith(Singleton::class.java)
+            .forEach { type ->
+                val obj = requestNewObject(type)
+                type.interfaces.forEach { ifc ->
+                    cache[ifc] = obj
+                }
+            }
+
+    private fun <T: Any> requestNewObject(type: Class<T>): T {
+        val implClass = when {
+            type.isInterface -> config.getImplClass(type)
+            else -> type
+        }
+        return factory.createObject(implClass)
+    }
 }

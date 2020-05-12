@@ -9,14 +9,23 @@ class ObjectFactory(
 ) {
 
     private val objectConfigurators: List<ObjectConfigurator> =
-        context.config.scanner.getSubTypesOf(ObjectConfigurator::class.java).map {
-            it.getDeclaredConstructor().newInstance()
-        }
+        context
+            .config
+            .scanner
+            .getSubTypesOf(ObjectConfigurator::class.java).map {
+                it.getDeclaredConstructor()
+                    .newInstance()
+            }
 
     private val proxyConfigurators: List<ProxyConfigurator> =
-        context.config.scanner.getSubTypesOf(ProxyConfigurator::class.java).map {
-            it.getDeclaredConstructor().newInstance()
-        }
+        context
+            .config
+            .scanner
+            .getSubTypesOf(ProxyConfigurator::class.java)
+            .map {
+                it.getDeclaredConstructor()
+                    .newInstance()
+            }
 
     fun <T: Any> createObject(implClass: Class<T>): T {
         val obj = create(implClass).also {
