@@ -1,36 +1,47 @@
 package io.darkloned.springthebuilder.infrastructure.configurator.proxy.handler
 
 import io.darkloned.springthebuilder.infrastructure.configurator.proxy.ProxyConfigurator
-import net.sf.cglib.proxy.Enhancer
-import net.sf.cglib.proxy.InvocationHandler
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 
 class DeprecatedHandlerProxyConfigurator : ProxyConfigurator {
 
-    // TODO: add support for @Deprecated above methods
     override fun replaceWithProxyIfNeeded(obj: Any, implClass: Class<*>): Any {
-        implClass.getAnnotation(Deprecated::class.java)?.let { annotation ->
-            val message = annotation.message
+        implClass.declaredMethods
+            .mapNotNull { it.getAnnotation(Deprecated::class.java) }
+            .takeIf { it.isNotEmpty() }
+            ?.let {
+                /*if (implClass.interfaces.isEmpty()) {
+                    return Enhancer.create(implClass, InvocationHandler { _, method, args ->
+                        runInvocationHandler(method, args, obj)
+                    })
+                }*/
+                check(implClass.interfaces.isNotEmpty()) {
+                    "${implClass.simpleName} doesn't implement any interfaces, unable to proxy"
+                }
 
-            if (implClass.interfaces.isEmpty()) {
-                return Enhancer.create(implClass, InvocationHandler { _, method, args ->
-                    runInvocationHandler(method, args, obj, message)
-                })
+                return Proxy.newProxyInstance(implClass.classLoader, implClass.interfaces) { _, method, args ->
+                    runInvocationHandler(method, args, obj, implClass)
+                }
             }
-
-            return Proxy.newProxyInstance(implClass.classLoader, implClass.interfaces) { _, method, args ->
-                runInvocationHandler(method, args, obj, message)
-            }
-        }
 
         return obj
     }
 
-    private fun runInvocationHandler(method: Method, args: Array<Any>?, obj: Any, message: String) {
-        val safeArgs = args ?: emptyArray()
+    private fun runInvocationHandler(method: Method, args: Array<Any>?, obj: Any, implClass: Class<*>) {
+        val methodName = method.name
+        val reflectArgs = args ?: emptyArray()
+        val langArgs = reflectArgs
+            .map { it.javaClass }
+            .toTypedArray()
 
-        println("=== deprecation alert: $message ===")
-        method.invoke(obj, *safeArgs)
+        implClass
+            .getDeclaredMethod(methodName, *langArgs)
+            .getAnnotation(Deprecated::class.java)
+            ?.let {
+                println("=== ${methodName}() is deprecated : ${it.message} ===")
+            }
+
+        method.invoke(obj, *reflectArgs)
     }
 }
